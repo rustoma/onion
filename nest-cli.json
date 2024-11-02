@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json.schemastore.org/nest-cli",
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "apps/onion/src",
+  "compilerOptions": {
+    "deleteOutDir": true,
+    "webpack": true,
+    "tsConfigPath": "apps/onion/tsconfig.app.json"
+  },
+  "monorepo": true,
+  "root": "apps/onion",
+  "projects": {
+    "onion-api": {
+      "type": "application",
+      "root": "apps/onion-api",
+      "entryFile": "main",
+      "sourceRoot": "apps/onion-api/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/onion-api/tsconfig.app.json"
+      }
+    },
+    "onion-scrapper": {
+      "type": "application",
+      "root": "apps/onion-scrapper",
+      "entryFile": "main",
+      "sourceRoot": "apps/onion-scrapper/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/onion-scrapper/tsconfig.app.json"
+      }
+    },
+    "db": {
+      "type": "library",
+      "root": "libs/db",
+      "entryFile": "index",
+      "sourceRoot": "libs/db/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/db/tsconfig.lib.json"
+      }
+    }
+  }
+}
