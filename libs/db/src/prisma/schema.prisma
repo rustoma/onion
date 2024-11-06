@@ -22,13 +22,14 @@ model Queries {
 }
 
 model Product {
-  id        Int      @id @default(autoincrement())
-  asin      String   @unique
-  title     String
-  image     String?
-  createdAt DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @db.Timestamptz(6)
-  prices    Price[]
+  id         Int      @id @default(autoincrement())
+  asin       String   @unique
+  title      String
+  image      String?
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(6)
+  priceAlert Int
+  prices     Price[]
 }
 
 model Price {

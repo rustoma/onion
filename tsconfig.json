@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "module": "commonjs",
+    "allowJs": true,
     "declaration": true,
     "removeComments": true,
     "emitDecoratorMetadata": true,
@@ -29,6 +30,12 @@
       ],
       "@app/db/*": [
         "libs/db/src/*"
+      ],
+      "@scrapper/*": [
+        "apps/onion-scrapper/src/*"
+      ],
+      "@api/*": [
+        "apps/onion-api/src/*"
       ]
     }
   }

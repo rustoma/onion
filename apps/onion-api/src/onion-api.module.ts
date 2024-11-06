@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { OnionApiController } from './onion-api.controller';
-import { OnionApiService } from './onion-api.service';
+import { OnionApiController } from '@api/onion-api.controller';
+import { OnionApiService } from '@api/onion-api.service';
 
 @Module({
   imports: [],

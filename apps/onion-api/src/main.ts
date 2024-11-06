@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { OnionApiModule } from './onion-api.module';
+import { OnionApiModule } from '@api/onion-api.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(OnionApiModule);

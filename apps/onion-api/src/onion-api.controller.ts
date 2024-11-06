@@ -1,5 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
-import { OnionApiService } from './onion-api.service';
+import { OnionApiService } from '@api/onion-api.service';
 
 @Controller()
 export class OnionApiController {
