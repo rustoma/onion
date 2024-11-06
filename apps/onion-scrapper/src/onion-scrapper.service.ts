@@ -197,57 +197,61 @@ export class OnionScrapperService {
   }
 
   async scrapByAsinApi() {
-    const apiKey = this.configService.get<string>('SCRAPING_FISH_API_KEY');
+    const { browser, page } = await this.launchBrowser();
 
-    const payload = {
-      api_key: apiKey,
-      url: 'https://www.hagglezon.com/en/s/B0D4V6GYX3',
-      js_scenario: JSON.stringify({
-        steps: [
-          { wait_for: '.user-options' },
-          { click: '[data-test="user-options-btn"]' },
-          { wait_for: '.currency-list' },
-          { click: 'input[name="currency"][value="PLN"]' },
-          { wait_for: '.sub-menu button' },
-          { click: '.sub-menu button' },
-          { wait: 3000 },
-          { wait_for: '.search-results-container' },
-          { wait_for: '.list-prices' },
-        ],
-      }),
-    };
+    await page.goto('https://www.hagglezon.com/en/s/B0B797ZPF5'); // Replace with your URL
 
-    const response = await firstValueFrom(
-      this.httpService.get('https://scraping.narf.ai/api/v1/', {
-        params: payload,
-      }),
-    );
+    await page.waitForSelector('.user-options', { timeout: 10000 });
 
-    const data = response.data;
+    await page.click('[data-test="user-options-btn"]');
 
-    const $ = cheerio.load(data);
+    await page.waitForSelector('.currency-list', { timeout: 10000 });
 
-    const prices = $('.list-prices .price-item')
-      .map((_, priceItem) => {
-        const priceElement = $(priceItem);
-        const domainLink = priceElement.find('.buy-button').attr('href');
-        const domainMatch = domainLink
-          ? domainLink.match(/amazon\.(\w{2})/)
-          : null;
-        const domain = domainMatch ? domainMatch[1] : null;
+    await page.click('input[name="currency"][value="PLN"]');
 
-        const priceText = priceElement.find('.price-value').text();
-        const priceValue = priceText
-          ? parseFloat(priceText.replace(/[^\d,.-]+/g, '').replace(',', '.'))
-          : null;
-        const productLink = domainLink ? domainLink.split('?')[0] : null;
+    await page.waitForSelector('.sub-menu button', { timeout: 10000 });
 
-        return domain && priceValue && productLink
-          ? { domain, priceValue, productLink }
-          : null;
-      })
-      .get()
-      .filter(Boolean) as PriceData[]; // Use .get() to convert Cheerio object to array
+    await page.click('.sub-menu button');
+
+    await this.sleep(3000);
+
+    await page.waitForSelector('.search-results-container', { timeout: 10000 });
+
+    await page.waitForSelector('.card-media:not(.fake-element)', {
+      timeout: 10000,
+    });
+
+    const prices = await page.evaluate(() => {
+      const priceItems = Array.from(
+        document.querySelectorAll(
+          '.highlighted-product .list-prices .price-item',
+        ),
+      );
+
+      return priceItems
+        .map((priceItem) => {
+          const priceElement = priceItem;
+          const domainLink = priceElement
+            .querySelector('.buy-button')
+            ?.getAttribute('href');
+          const domainMatch = domainLink
+            ? domainLink.match(/amazon\.(\w{2})/)
+            : null;
+          const domain = domainMatch ? domainMatch[1] : null;
+
+          const priceText =
+            priceElement.querySelector('.price-value')?.textContent || '';
+          const priceValue = priceText
+            ? parseFloat(priceText.replace(/[^\d,.-]+/g, '').replace(',', '.'))
+            : null;
+          const productLink = domainLink ? domainLink.split('?')[0] : null;
+
+          return domain && priceValue && productLink
+            ? { domain, priceValue, productLink }
+            : null;
+        })
+        .filter(Boolean) as PriceData[];
+    });
 
     // Create an object to hold single price per domain
     const priceObject: Record<
@@ -293,5 +297,7 @@ export class OnionScrapperService {
     } else {
       console.log(`Not enough prices found for comparison.`);
     }
+
+    await browser.close();
   }
 }
