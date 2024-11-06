@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { firstValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
 import * as cheerio from 'cheerio';
-import * as fs from 'fs';
 import { connect } from 'puppeteer-real-browser';
 
 import { ConfigService } from '@nestjs/config';
@@ -20,143 +19,181 @@ export class OnionScrapperService {
     private configService: ConfigService,
   ) {}
 
-  // async launchBrowser() {
-  //   const { browser, page } = await connect({
-  //     headless: false,
-  //
-  //     args: [],
-  //
-  //     customConfig: {},
-  //
-  //     turnstile: true,
-  //
-  //     connectOption: {},
-  //
-  //     disableXvfb: false,
-  //     ignoreAllFlags: false,
-  //     // proxy:{
-  //     //     host:'<proxy-host>',
-  //     //     port:'<proxy-port>',
-  //     //     username:'<proxy-username>',
-  //     //     password:'<proxy-password>'
-  //     // }
-  //   });
-  //
-  //   return { browser, page };
-  // }
+  async sleep(ms) {
+    return new Promise((res) => setTimeout(res, ms));
+  }
 
-  // async countProductCards(page) {
-  //   let totalCount = 0;
-  //   const timeout = 60000; // 60 seconds
-  //   const startTime = Date.now();
-  //
-  //   while (true) {
-  //     // Count current .product-card elements
-  //     const productCards = await page.$$('.product-card');
-  //     totalCount = productCards.length;
-  //
-  //     // Check if the spinner-container exists
-  //     const spinnerExists = (await page.$('.spinner-container')) !== null;
-  //
-  //     // If spinner does not exist, break the loop
-  //     if (!spinnerExists) {
-  //       break;
-  //     }
-  //
-  //     // Scroll to the bottom of the page
-  //     await page.evaluate(() => {
-  //       window.scrollTo(0, document.body.scrollHeight);
-  //     });
-  //
-  //     // Check if we've reached the timeout
-  //     if (Date.now() - startTime > timeout) {
-  //       console.log('Timeout reached while waiting for more product cards.');
-  //       break;
-  //     }
-  //   }
-  //
-  //   return totalCount;
-  // }
+  async launchBrowser() {
+    const { browser, page } = await connect({
+      args: ['--start-maximized'],
+
+      headless: false,
+
+      customConfig: {},
+
+      turnstile: true,
+
+      connectOption: {
+        defaultViewport: null,
+      },
+
+      disableXvfb: false,
+      ignoreAllFlags: false,
+      // proxy:{
+      //     host:'<proxy-host>',
+      //     port:'<proxy-port>',
+      //     username:'<proxy-username>',
+      //     password:'<proxy-password>'
+      // }
+    });
+
+    return { browser, page };
+  }
 
   async scrapByKeywordApi() {
-    const apiKey = this.configService.get<string>('SCRAPING_FISH_API_KEY');
+    // Maximum time for the while loop scrolling/loading process
+    const SCROLL_TIMEOUT = 60000; // 60 seconds
 
-    const payload = {
-      api_key: apiKey,
-      url: 'https://www.hagglezon.com/en/s/benq',
-      // render_js: 'true',
-      js_scenario: JSON.stringify({
-        steps: [
-          { wait_for: '.user-options' },
-          { click: '[data-test="user-options-btn"]' },
-          { wait_for: '.currency-list' },
-          { click: 'input[name="currency"][value="PLN"]' },
-          { wait_for: '.sub-menu button' },
-          { click: '.sub-menu button' },
-          { wait_for: '.search-results' },
-          { wait_for: '.card-media:not(.fake-element)' },
-          // { scroll: 5000 },
-          // {
-          //   evaluate: 'window.scrollTo(0, document.body.scrollHeight)',
-          // },
-          // { wait: 5000 },
-          // {
-          //   evaluate: 'window.scrollTo(0, document.body.scrollHeight)',
-          // },
-          // { scroll: 5000 },
-          // { wait: 5000 },
-          // {
-          //   evaluate: `() => new Promise((resolve) => {
-          //     const checkSpinner = setInterval(() => {
-          //       window.scrollTo(0, document.body.scrollHeight);
-          //
-          //       console.log("Another iteration")
-          //
-          //       // Check if the spinner-container exists
-          //       const spinnerExists = document.querySelector('.spinner-container') !== null;
-          //
-          //       // If spinner does not exist, resolve the promise
-          //       if (!spinnerExists) {
-          //         clearInterval(checkSpinner);
-          //         resolve();
-          //       }
-          //     }, 3000);
-          //   });
-          // `,
-          // },
-        ],
-      }),
-    };
+    const { browser, page } = await this.launchBrowser();
 
-    const response = await firstValueFrom(
-      this.httpService.get('https://scraping.narf.ai/api/v1/', {
-        params: payload,
-      }),
-    );
+    await page.goto('https://www.hagglezon.com/en/s/benq'); // Replace with your URL
 
-    // console.dir(response, { depth: null });
+    await page.waitForSelector('.user-options', { timeout: 10000 });
 
-    const data = response.data;
+    await page.click('[data-test="user-options-btn"]');
 
-    fs.writeFileSync('./tmp/test-sync.txt', data);
+    await page.waitForSelector('.currency-list', { timeout: 10000 });
 
-    const $ = cheerio.load(data);
+    await page.click('input[name="currency"][value="PLN"]');
 
-    // Scrape product data
-    const products = $('.product-card')
-      .map((_, card) => {
-        const title = $(card)
-          .find('.card-title span.text-wrapper')
-          .text()
-          .trim();
-        // const imageUrl = $(card).find('.carousel__inner-slide img').attr('src') || '';
-        const price = $(card).find('.price-value').text().trim();
+    await page.waitForSelector('.sub-menu button', { timeout: 10000 });
 
-        return { title, price };
-      })
-      .get();
+    await page.click('.sub-menu button');
 
-    console.dir(products, { depth: null });
+    await page.waitForSelector('.search-results', { timeout: 10000 });
+
+    await page.waitForSelector('.card-media:not(.fake-element)', {
+      timeout: 10000,
+    });
+
+    // Scroll and wait strategy with a timeout for loading additional content
+    const startScrollTime = Date.now();
+    let hasMoreContent = true;
+    while (hasMoreContent) {
+      // Check if scrolling timeout has been reached
+      if (Date.now() - startScrollTime > SCROLL_TIMEOUT) {
+        console.log('Scrolling timeout reached.');
+        break;
+      }
+
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+      await this.sleep(5000);
+
+      // Check if the loading spinner is still visible
+      hasMoreContent = await page.evaluate(() => {
+        return document.querySelector('.spinner-container') !== null;
+      });
+    }
+
+    await this.sleep(5000);
+
+    const products = await page.evaluate(() => {
+      const allProducts = [];
+      const productElements = document.querySelectorAll('.product-card');
+      const productsArray = Array.from(productElements);
+
+      for (const product of productsArray) {
+        const titleElement = product.querySelector(
+          '.card-title span.text-wrapper',
+        );
+
+        const title = titleElement ? titleElement.textContent.trim() : '';
+
+        // Extract prices with domain, price, and product link details
+        const priceItems = product.querySelectorAll('.list-prices .price-item');
+
+        const prices = Array.from(priceItems)
+          .map((priceItem) => {
+            const priceElement = priceItem.querySelector('.price-value');
+            const buyButton = priceItem.querySelector(
+              '.buy-button',
+            ) as HTMLAnchorElement;
+            const domainLink = buyButton ? buyButton.href : null;
+
+            // Extract domain from the URL if it matches "amazon.xx" pattern
+            const domainMatch = domainLink
+              ? domainLink.match(/amazon\.(\w{2})/)
+              : null;
+            const domain = domainMatch ? domainMatch[1] : null;
+
+            const priceText = priceElement
+              ? priceElement.textContent.trim()
+              : null;
+            const priceValue = priceText
+              ? parseFloat(
+                  priceText.replace(/[^\d,.-]+/g, '').replace(',', '.'),
+                )
+              : null;
+            const productLink = domainLink ? domainLink.split('?')[0] : null;
+
+            return domain && priceValue && productLink
+              ? { domain, priceValue, productLink }
+              : null;
+          })
+          .filter(Boolean) as PriceData[]; // Filter out any null entries
+
+        allProducts.push({ title, prices });
+      }
+      return allProducts;
+    });
+
+    products.forEach(({ prices, title }) => {
+      // Create an object to hold single price per domain
+      const priceObject: Record<
+        string,
+        { priceValue: number; productLink: string }
+      > = {};
+      prices.forEach(({ domain, priceValue, productLink }) => {
+        priceObject[domain] = { priceValue, productLink };
+      });
+
+      // Convert the price object to an array for sorting
+      const pricesArray = Object.entries(priceObject).map(
+        ([domain, { priceValue, productLink }]) => ({
+          domain,
+          priceValue,
+          productLink,
+        }),
+      );
+
+      // Sort prices by value
+      pricesArray.sort((a, b) => a.priceValue - b.priceValue);
+
+      const lowestPrice = pricesArray[0];
+      const secondLowestPrice = pricesArray[1];
+
+      if (lowestPrice && secondLowestPrice) {
+        const priceDifferencePercentage =
+          ((secondLowestPrice.priceValue - lowestPrice.priceValue) /
+            secondLowestPrice.priceValue) *
+          100;
+
+        if (priceDifferencePercentage > 20) {
+          console.log(
+            `Product ${title} - The price for ${lowestPrice.domain} is lower than 20% compared to ${secondLowestPrice.domain}.`,
+          );
+        } else {
+          console.log(
+            `Product ${title} - The price for ${lowestPrice.domain} is NOT lower than 20% compared to ${secondLowestPrice.domain}.`,
+          );
+        }
+      } else {
+        console.log(`Not enough prices found for comparison.`);
+      }
+    });
+
+    // Close browser after interactions are done
+    await browser.close();
   }
 
   async scrapByAsinApi() {
