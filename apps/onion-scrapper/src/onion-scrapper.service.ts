@@ -1,15 +1,29 @@
 import { Injectable } from '@nestjs/common';
-import { firstValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
-import * as cheerio from 'cheerio';
 import { connect } from 'puppeteer-real-browser';
 
 import { ConfigService } from '@nestjs/config';
+import * as cheerio from 'cheerio';
+import { Element } from 'domhandler';
 
-interface PriceData {
+export interface PriceData {
   domain: string;
-  priceValue: number;
-  productLink: string;
+  value: number;
+  url: string;
+}
+
+interface Product {
+  title: string;
+  asin: string;
+  image: string;
+  prices: PriceData[];
+}
+
+interface Deal {
+  title: string;
+  asin: string;
+  image: string;
+  price: Omit<PriceData, 'domain'>;
 }
 
 @Injectable()
@@ -19,7 +33,7 @@ export class OnionScrapperService {
     private configService: ConfigService,
   ) {}
 
-  async sleep(ms) {
+  async sleep(ms: number) {
     return new Promise((res) => setTimeout(res, ms));
   }
 
@@ -50,9 +64,103 @@ export class OnionScrapperService {
     return { browser, page };
   }
 
+  extractASIN(url: string): string | null {
+    if (!url) return null;
+    const match = url.match(/\/dp\/([A-Z0-9]+)/);
+    return match ? match[1] : null;
+  }
+
+  extractAsicFromPriceElement(priceElement: Element): string | null {
+    // Load the priceElement into Cheerio
+    const $ = cheerio.load('<div>' + priceElement.toString() + '</div>'); // Wrap it in a <div>
+
+    const buyButton = $(priceElement).find('.buy-button').attr('href'); // Find href directly with Cheerio
+
+    const url = buyButton || null;
+
+    if (!url) return null;
+
+    return this.extractASIN(url);
+  }
+
+  extractLinkDomainPriceFromPriceItem(priceItem: Element): PriceData {
+    const $ = cheerio.load('<div>' + priceItem.toString() + '</div>'); // Wrapping priceItem as a Cheerio object
+
+    const priceElement = $(priceItem).find('.price-value');
+    const domainLink = $(priceItem).find('.buy-button').attr('href');
+
+    // Extract domain from the URL if it matches "amazon.xx" pattern
+    const domainMatch = domainLink ? domainLink.match(/amazon\.(\w{2})/) : null;
+    const domain = domainMatch ? domainMatch[1] : null;
+
+    const priceText = priceElement.text().trim();
+
+    const priceValue = priceText
+      ? parseFloat(priceText.replace(/[^\d,.-]+/g, '').replace(',', '.'))
+      : null;
+
+    const url = domainLink ? domainLink.split('?')[0] : null;
+
+    return domain && priceValue && url
+      ? { domain, value: priceValue, url }
+      : null;
+  }
+
+  findDeals(products: Product[]): Deal[] {
+    return products
+      .map((product) => {
+        const { title, asin, image, prices } = product;
+
+        const priceObject: Record<string, { value: number; url: string }> = {};
+
+        prices.forEach(({ domain, value, url }) => {
+          priceObject[domain] = { value, url };
+        });
+
+        // Convert the price object to an array for sorting
+        const pricesArray = Object.entries(priceObject).map(
+          ([domain, { value, url }]) => ({
+            domain,
+            value,
+            url,
+          }),
+        );
+
+        // Sort prices by value
+        pricesArray.sort((a, b) => a.value - b.value);
+
+        const lowestPrice = pricesArray[0];
+        const secondLowestPrice = pricesArray[1];
+
+        if (lowestPrice && secondLowestPrice) {
+          const priceDifferencePercentage =
+            ((secondLowestPrice.value - lowestPrice.value) /
+              secondLowestPrice.value) *
+            100;
+
+          if (priceDifferencePercentage > 5) {
+            const { url, value } = lowestPrice;
+
+            return {
+              asin,
+              title,
+              image,
+              price: { value: value, url: url },
+            };
+          }
+
+          return null;
+        } else {
+          console.log(`Not enough prices found for comparison.`);
+          return null;
+        }
+      })
+      .filter(Boolean);
+  }
+
   async scrapByKeywordApi() {
     // Maximum time for the while loop scrolling/loading process
-    const SCROLL_TIMEOUT = 60000; // 60 seconds
+    const SCROLL_TIMEOUT = 15000; // 60 seconds
 
     const { browser, page } = await this.launchBrowser();
 
@@ -82,7 +190,6 @@ export class OnionScrapperService {
     while (hasMoreContent) {
       // Check if scrolling timeout has been reached
       if (Date.now() - startScrollTime > SCROLL_TIMEOUT) {
-        console.log('Scrolling timeout reached.');
         break;
       }
 
@@ -95,111 +202,52 @@ export class OnionScrapperService {
       });
     }
 
-    await this.sleep(5000);
+    await this.sleep(2000);
 
-    const products = await page.evaluate(() => {
-      const allProducts = [];
-      const productElements = document.querySelectorAll('.product-card');
-      const productsArray = Array.from(productElements);
-
-      for (const product of productsArray) {
-        const titleElement = product.querySelector(
-          '.card-title span.text-wrapper',
-        );
-
-        const title = titleElement ? titleElement.textContent.trim() : '';
-
-        // Extract prices with domain, price, and product link details
-        const priceItems = product.querySelectorAll('.list-prices .price-item');
-
-        const prices = Array.from(priceItems)
-          .map((priceItem) => {
-            const priceElement = priceItem.querySelector('.price-value');
-            const buyButton = priceItem.querySelector(
-              '.buy-button',
-            ) as HTMLAnchorElement;
-            const domainLink = buyButton ? buyButton.href : null;
-
-            // Extract domain from the URL if it matches "amazon.xx" pattern
-            const domainMatch = domainLink
-              ? domainLink.match(/amazon\.(\w{2})/)
-              : null;
-            const domain = domainMatch ? domainMatch[1] : null;
-
-            const priceText = priceElement
-              ? priceElement.textContent.trim()
-              : null;
-            const priceValue = priceText
-              ? parseFloat(
-                  priceText.replace(/[^\d,.-]+/g, '').replace(',', '.'),
-                )
-              : null;
-            const productLink = domainLink ? domainLink.split('?')[0] : null;
-
-            return domain && priceValue && productLink
-              ? { domain, priceValue, productLink }
-              : null;
-          })
-          .filter(Boolean) as PriceData[]; // Filter out any null entries
-
-        allProducts.push({ title, prices });
-      }
-      return allProducts;
-    });
-
-    products.forEach(({ prices, title }) => {
-      // Create an object to hold single price per domain
-      const priceObject: Record<
-        string,
-        { priceValue: number; productLink: string }
-      > = {};
-      prices.forEach(({ domain, priceValue, productLink }) => {
-        priceObject[domain] = { priceValue, productLink };
-      });
-
-      // Convert the price object to an array for sorting
-      const pricesArray = Object.entries(priceObject).map(
-        ([domain, { priceValue, productLink }]) => ({
-          domain,
-          priceValue,
-          productLink,
-        }),
-      );
-
-      // Sort prices by value
-      pricesArray.sort((a, b) => a.priceValue - b.priceValue);
-
-      const lowestPrice = pricesArray[0];
-      const secondLowestPrice = pricesArray[1];
-
-      if (lowestPrice && secondLowestPrice) {
-        const priceDifferencePercentage =
-          ((secondLowestPrice.priceValue - lowestPrice.priceValue) /
-            secondLowestPrice.priceValue) *
-          100;
-
-        if (priceDifferencePercentage > 20) {
-          console.log(
-            `Product ${title} - The price for ${lowestPrice.domain} is lower than 20% compared to ${secondLowestPrice.domain}.`,
-          );
-        } else {
-          console.log(
-            `Product ${title} - The price for ${lowestPrice.domain} is NOT lower than 20% compared to ${secondLowestPrice.domain}.`,
-          );
-        }
-      } else {
-        console.log(`Not enough prices found for comparison.`);
-      }
-    });
-
-    // Close browser after interactions are done
+    const html = await page.content();
     await browser.close();
+    const $ = cheerio.load(html);
+
+    const products: Product[] = [];
+
+    $('.product-card').each((_, product) => {
+      const titleElement = $(product).find('.card-title span.text-wrapper');
+
+      const buyUrl = $(product)
+        .find('.list-prices .price-item .buy-button')
+        .attr('href');
+
+      const asin = buyUrl ? this.extractASIN(buyUrl) : null;
+
+      const imageUrl = $(product)
+        .find('.card-media .carousel__slider .carousel__slide img')
+        .attr('src');
+
+      const title = titleElement.text().trim();
+
+      // Extract prices with domain, price, and product link details
+      const prices = $(product)
+        .find('.list-prices .price-item')
+        .map((_, priceItem) =>
+          this.extractLinkDomainPriceFromPriceItem(priceItem),
+        )
+        .get()
+        .filter(Boolean); // Filter out any null entries
+
+      if (asin && title) {
+        products.push({ title, asin, image: imageUrl ?? '', prices });
+      }
+    });
+
+    const deals = this.findDeals(products);
+
+    console.dir(deals, { depth: null });
   }
 
   async scrapByAsinApi() {
     const { browser, page } = await this.launchBrowser();
 
-    await page.goto('https://www.hagglezon.com/en/s/B0B797ZPF5'); // Replace with your URL
+    await page.goto('https://www.hagglezon.com/en/s/B07W9LRB2J'); // TODO: Replace URL
 
     await page.waitForSelector('.user-options', { timeout: 10000 });
 
@@ -221,83 +269,44 @@ export class OnionScrapperService {
       timeout: 10000,
     });
 
-    const prices = await page.evaluate(() => {
-      const priceItems = Array.from(
-        document.querySelectorAll(
-          '.highlighted-product .list-prices .price-item',
-        ),
-      );
+    const html = await page.content();
+    await browser.close();
 
-      return priceItems
-        .map((priceItem) => {
-          const priceElement = priceItem;
-          const domainLink = priceElement
-            .querySelector('.buy-button')
-            ?.getAttribute('href');
-          const domainMatch = domainLink
-            ? domainLink.match(/amazon\.(\w{2})/)
-            : null;
-          const domain = domainMatch ? domainMatch[1] : null;
+    const $ = cheerio.load(html);
 
-          const priceText =
-            priceElement.querySelector('.price-value')?.textContent || '';
-          const priceValue = priceText
-            ? parseFloat(priceText.replace(/[^\d,.-]+/g, '').replace(',', '.'))
-            : null;
-          const productLink = domainLink ? domainLink.split('?')[0] : null;
+    const highlightedProduct = $('.highlighted-product');
 
-          return domain && priceValue && productLink
-            ? { domain, priceValue, productLink }
-            : null;
-        })
-        .filter(Boolean) as PriceData[];
-    });
-
-    // Create an object to hold single price per domain
-    const priceObject: Record<
-      string,
-      { priceValue: number; productLink: string }
-    > = {};
-    prices.forEach(({ domain, priceValue, productLink }) => {
-      priceObject[domain] = { priceValue, productLink };
-    });
-
-    // Convert the price object to an array for sorting
-    const pricesArray = Object.entries(priceObject).map(
-      ([domain, { priceValue, productLink }]) => ({
-        domain,
-        priceValue,
-        productLink,
-      }),
+    const titleElement = $(highlightedProduct).find(
+      '.card-title span.text-wrapper',
     );
 
-    // Sort prices by value
-    pricesArray.sort((a, b) => a.priceValue - b.priceValue);
+    const buyUrl = $(highlightedProduct)
+      .find('.list-prices .price-item .buy-button')
+      .attr('href');
 
-    const lowestPrice = pricesArray[0];
-    const secondLowestPrice = pricesArray[1];
+    const asin = buyUrl ? this.extractASIN(buyUrl) : null;
 
-    console.dir(pricesArray, { depth: null });
+    const imageUrl = $(highlightedProduct)
+      .find('.card-media .carousel__slider .carousel__slide img')
+      .attr('src');
 
-    if (lowestPrice && secondLowestPrice) {
-      const priceDifferencePercentage =
-        ((secondLowestPrice.priceValue - lowestPrice.priceValue) /
-          secondLowestPrice.priceValue) *
-        100;
+    const title = titleElement.text().trim();
 
-      if (priceDifferencePercentage > 20) {
-        console.log(
-          `The price for ${lowestPrice.domain} is lower than 20% compared to ${secondLowestPrice.domain}.`,
-        );
-      } else {
-        console.log(
-          `The price for ${lowestPrice.domain} is NOT lower than 20% compared to ${secondLowestPrice.domain}.`,
-        );
-      }
-    } else {
-      console.log(`Not enough prices found for comparison.`);
-    }
+    // Extract prices with domain, price, and product link details
+    const prices = $(highlightedProduct)
+      .find('.list-prices .price-item')
+      .map((_, priceItem) =>
+        this.extractLinkDomainPriceFromPriceItem(priceItem),
+      )
+      .get()
+      .filter(Boolean); // Filter out any null entries
 
-    await browser.close();
+    if (!asin || !title) return null;
+
+    const product = { title, asin, image: imageUrl ?? '', prices };
+
+    const deals = this.findDeals([product]);
+
+    console.dir(deals, { depth: null });
   }
 }
