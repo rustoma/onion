@@ -63,19 +63,6 @@ export class OnionScrapperService {
     return match ? match[1] : null;
   }
 
-  extractAsicFromPriceElement(priceElement: Element): string | null {
-    // Load the priceElement into Cheerio
-    const $ = cheerio.load('<div>' + priceElement.toString() + '</div>'); // Wrap it in a <div>
-
-    const buyButton = $(priceElement).find('.buy-button').attr('href'); // Find href directly with Cheerio
-
-    const url = buyButton || null;
-
-    if (!url) return null;
-
-    return this.extractASIN(url);
-  }
-
   extractLinkDomainPriceFromPriceItem(priceItem: Element): PriceData {
     const $ = cheerio.load('<div>' + priceItem.toString() + '</div>'); // Wrapping priceItem as a Cheerio object
 
