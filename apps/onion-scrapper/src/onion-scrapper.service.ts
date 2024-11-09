@@ -1,8 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios';
 import { connect } from 'puppeteer-real-browser';
 
-import { ConfigService } from '@nestjs/config';
 import * as cheerio from 'cheerio';
 import { Element } from 'domhandler';
 
@@ -28,11 +26,6 @@ interface Deal {
 
 @Injectable()
 export class OnionScrapperService {
-  constructor(
-    private readonly httpService: HttpService,
-    private configService: ConfigService,
-  ) {}
-
   async sleep(ms: number) {
     return new Promise((res) => setTimeout(res, ms));
   }
