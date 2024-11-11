@@ -1,8 +1,8 @@
 import { NestFactory } from '@nestjs/core';
-import { OnionScrapperModule } from './onion-scrapper.module';
+import { OnionScraperModule } from '@scraper/onion-scraper.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(OnionScrapperModule);
+  const app = await NestFactory.create(OnionScraperModule);
   await app.listen(process.env.port ?? 3000);
 }
 bootstrap();

@@ -19,13 +19,13 @@
         "tsConfigPath": "apps/onion-api/tsconfig.app.json"
       }
     },
-    "onion-scrapper": {
+    "onion-scraper": {
       "type": "application",
-      "root": "apps/onion-scrapper",
+      "root": "apps/onion-scraper",
       "entryFile": "main",
-      "sourceRoot": "apps/onion-scrapper/src",
+      "sourceRoot": "apps/onion-scraper/src",
       "compilerOptions": {
-        "tsConfigPath": "apps/onion-scrapper/tsconfig.app.json"
+        "tsConfigPath": "apps/onion-scraper/tsconfig.app.json"
       }
     },
     "db": {

@@ -1,14 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
-import { OnionScrapperModule } from './../src/onion-scrapper.module';
+import { OnionScraperModule } from '@scraper/onion-scraper.module';
 
-describe('OnionScrapperController (e2e)', () => {
+describe('OnionScraperController (e2e)', () => {
   let app: INestApplication;
 
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [OnionScrapperModule],
+      imports: [OnionScraperModule],
     }).compile();
 
     app = moduleFixture.createNestApplication();

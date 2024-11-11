@@ -1,31 +1,18 @@
-import { Injectable } from '@nestjs/common';
 import { connect } from 'puppeteer-real-browser';
-
-import * as cheerio from 'cheerio';
 import { Element } from 'domhandler';
+import * as cheerio from 'cheerio';
+import { Processor, WorkerHost } from '@nestjs/bullmq';
+import {
+  Deal,
+  PriceData,
+  Product,
+  ScraperJobNames,
+} from '@scraper/onion-scraper.interface';
+import { Job } from 'bullmq';
+import { SCRAPER_JOBS } from '@scraper/onion-scraper.consts';
 
-export interface PriceData {
-  domain: string;
-  value: number;
-  url: string;
-}
-
-interface Product {
-  title: string;
-  asin: string;
-  image: string;
-  prices: PriceData[];
-}
-
-interface Deal {
-  title: string;
-  asin: string;
-  image: string;
-  price: Omit<PriceData, 'domain'>;
-}
-
-@Injectable()
-export class OnionScrapperService {
+@Processor('scraper', { concurrency: 3 })
+export class OnionScraperConsumer extends WorkerHost {
   async sleep(ms: number) {
     return new Promise((res) => setTimeout(res, ms));
   }
@@ -138,7 +125,7 @@ export class OnionScrapperService {
       .filter(Boolean);
   }
 
-  async scrapByKeywordApi() {
+  async handleScrapByKeyword() {
     // Maximum time for the while loop scrolling/loading process
     const SCROLL_TIMEOUT = 15000; // 60 seconds
 
@@ -224,7 +211,7 @@ export class OnionScrapperService {
     console.dir(deals, { depth: null });
   }
 
-  async scrapByAsinApi() {
+  async handleScrapByAsin() {
     const { browser, page } = await this.launchBrowser();
 
     await page.goto('https://www.hagglezon.com/en/s/B07W9LRB2J'); // TODO: Replace URL
@@ -288,5 +275,18 @@ export class OnionScrapperService {
     const deals = this.findDeals([product]);
 
     console.dir(deals, { depth: null });
+  }
+
+  async process(job: Job<any, any, ScraperJobNames>): Promise<any> {
+    switch (job.name) {
+      case SCRAPER_JOBS.scrapByAsin: {
+        await this.handleScrapByAsin();
+        break;
+      }
+      case SCRAPER_JOBS.scrapByKeyword: {
+        await this.handleScrapByKeyword();
+        break;
+      }
+    }
   }
 }
