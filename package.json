@@ -20,6 +20,9 @@
     "test:e2e": "jest --config ./apps/onion/test/jest-e2e.json"
   },
   "dependencies": {
+    "@bull-board/api": "^6.3.3",
+    "@bull-board/express": "^6.3.3",
+    "@bull-board/nestjs": "^6.3.3",
     "@nestjs/axios": "^3.1.1",
     "@nestjs/bullmq": "^10.2.2",
     "@nestjs/common": "^10.0.0",
@@ -83,7 +86,7 @@
     "moduleNameMapper": {
       "^lib/db(|/.*)$": "<rootDir>/libs/db/src/$1",
       "^@app/db(|/.*)$": "<rootDir>/libs/db/src/$1",
-      "^@scrapper(|/.*)$": "<rootDir>/apps/onion-scrapper/src/$1",
+      "^@scraper(|/.*)$": "<rootDir>/apps/onion-scraper/src/$1",
       "^@api(|/.*)$": "<rootDir>/apps/onion-api/src/$1"
     }
   }
