@@ -13,23 +13,23 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Queries {
-  id        Int      @id @default(autoincrement())
-  keyword   String   @unique
-  asin      String?  @unique
-  createdAt DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+model Query {
+  id         Int      @id @default(autoincrement())
+  keyword    String?  @unique
+  asin       String?  @unique
+  priceAlert Int?
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(6)
 }
 
 model Product {
-  id         Int      @id @default(autoincrement())
-  asin       String   @unique
-  title      String
-  image      String?
-  createdAt  DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt  DateTime @updatedAt @db.Timestamptz(6)
-  priceAlert Int
-  prices     Price[]
+  id        Int      @id @default(autoincrement())
+  asin      String   @unique
+  title     String
+  image     String?
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  prices    Price[]
 }
 
 model Price {
