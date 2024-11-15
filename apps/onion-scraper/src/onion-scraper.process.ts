@@ -4,15 +4,23 @@ import * as cheerio from 'cheerio';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import {
   Deal,
+  HandleAsinDeal,
   PriceData,
   Product,
   ScraperJobNames,
+  ScrapJob,
 } from '@scraper/onion-scraper.interface';
 import { Job } from 'bullmq';
 import { SCRAPER_JOBS } from '@scraper/onion-scraper.consts';
+import { Query } from '@prisma/client';
+import { DbService } from 'lib/db';
 
 @Processor('scraper', { concurrency: 3 })
 export class OnionScraperConsumer extends WorkerHost {
+  constructor(private db: DbService) {
+    super();
+  }
+
   async sleep(ms: number) {
     return new Promise((res) => setTimeout(res, ms));
   }
@@ -125,13 +133,15 @@ export class OnionScraperConsumer extends WorkerHost {
       .filter(Boolean);
   }
 
-  async handleScrapByKeyword() {
+  async handleScrapByKeyword(query: Query) {
+    const { keyword } = query;
+    if (!keyword) return;
     // Maximum time for the while loop scrolling/loading process
     const SCROLL_TIMEOUT = 15000; // 60 seconds
 
     const { browser, page } = await this.launchBrowser();
 
-    await page.goto('https://www.hagglezon.com/en/s/benq'); // Replace with your URL
+    await page.goto(`https://www.hagglezon.com/en/s/${keyword}`);
 
     await page.waitForSelector('.user-options', { timeout: 10000 });
 
@@ -208,13 +218,71 @@ export class OnionScraperConsumer extends WorkerHost {
 
     const deals = this.findDeals(products);
 
-    console.dir(deals, { depth: null });
+    if (Array.isArray(deals) && deals.length) {
+      await Promise.all(deals.map((deal) => this.handleDeal({ deal })));
+    }
   }
 
-  async handleScrapByAsin() {
+  async handleDeal({ deal, priceAlert }: HandleAsinDeal) {
+    const { title, asin, image, price } = deal;
+
+    const product = await this.db.product.upsert({
+      where: {
+        asin,
+      },
+      update: {
+        updatedAt: new Date(),
+      },
+      create: {
+        title,
+        asin,
+        image,
+      },
+    });
+
+    const activePrices = await this.db.price.findMany({
+      where: {
+        isActive: true,
+        productId: product.id,
+      },
+    });
+
+    const activePriceIds = activePrices.map((price) => price.id);
+
+    await this.db.price.updateMany({
+      where: {
+        id: {
+          in: activePriceIds,
+        },
+      },
+      data: {
+        isActive: false,
+      },
+    });
+
+    await this.db.price.create({
+      data: {
+        price: price.value,
+        url: price.url,
+        isActive: true,
+        productId: product.id,
+      },
+    });
+
+    if (priceAlert && price?.value <= priceAlert) {
+      console.log(
+        `Handle price alert because price is ${price.value} and price alert is ${priceAlert} for product ${title}`,
+      );
+    }
+  }
+
+  async handleScrapByAsin(query: Query) {
+    const { asin, priceAlert } = query;
+    if (!asin) return;
+
     const { browser, page } = await this.launchBrowser();
 
-    await page.goto('https://www.hagglezon.com/en/s/B07W9LRB2J'); // TODO: Replace URL
+    await page.goto(`https://www.hagglezon.com/en/s/${asin}`);
 
     await page.waitForSelector('.user-options', { timeout: 10000 });
 
@@ -247,12 +315,6 @@ export class OnionScraperConsumer extends WorkerHost {
       '.card-title span.text-wrapper',
     );
 
-    const buyUrl = $(highlightedProduct)
-      .find('.list-prices .price-item .buy-button')
-      .attr('href');
-
-    const asin = buyUrl ? this.extractASIN(buyUrl) : null;
-
     const imageUrl = $(highlightedProduct)
       .find('.card-media .carousel__slider .carousel__slide img')
       .attr('src');
@@ -268,23 +330,27 @@ export class OnionScraperConsumer extends WorkerHost {
       .get()
       .filter(Boolean); // Filter out any null entries
 
-    if (!asin || !title) return null;
+    if (!title) return null;
 
     const product = { title, asin, image: imageUrl ?? '', prices };
 
     const deals = this.findDeals([product]);
 
-    console.dir(deals, { depth: null });
+    if (Array.isArray(deals) && deals.length) {
+      await this.handleDeal({ deal: deals[0], priceAlert });
+    }
   }
 
-  async process(job: Job<any, any, ScraperJobNames>): Promise<any> {
+  async process(job: Job<ScrapJob, void, ScraperJobNames>): Promise<any> {
+    const { query } = job.data;
+
     switch (job.name) {
       case SCRAPER_JOBS.scrapByAsin: {
-        await this.handleScrapByAsin();
+        await this.handleScrapByAsin(query);
         break;
       }
       case SCRAPER_JOBS.scrapByKeyword: {
-        await this.handleScrapByKeyword();
+        await this.handleScrapByKeyword(query);
         break;
       }
     }

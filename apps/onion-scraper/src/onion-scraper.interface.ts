@@ -1,3 +1,4 @@
+import { Query } from '@prisma/client';
 import { SCRAPER_JOBS } from '@scraper/onion-scraper.consts';
 
 export interface PriceData {
@@ -22,3 +23,12 @@ export interface Deal {
 
 type ScraperJobKeys = keyof typeof SCRAPER_JOBS;
 export type ScraperJobNames = (typeof SCRAPER_JOBS)[ScraperJobKeys];
+
+export interface ScrapJob {
+  query: Query;
+}
+
+export interface HandleAsinDeal {
+  deal: Deal;
+  priceAlert?: number | null;
+}

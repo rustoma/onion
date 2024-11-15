@@ -5,13 +5,8 @@ import { OnionScraperService } from '@scraper/onion-scraper.service';
 export class OnionScraperController {
   constructor(private readonly onionScraperService: OnionScraperService) {}
 
-  @Get('scrap-asin')
+  @Get('scrap')
   async scrapByAsinApi() {
-    return await this.onionScraperService.handleScrapByAsin();
-  }
-
-  @Get('scrap-keywords')
-  async scrapByKeywordApi() {
-    return await this.onionScraperService.handleScrapByKeyword();
+    return await this.onionScraperService.scrap();
   }
 }
