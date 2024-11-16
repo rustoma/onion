@@ -1,14 +1,14 @@
 {
   "$schema": "https://json.schemastore.org/nest-cli",
   "collection": "@nestjs/schematics",
-  "sourceRoot": "apps/onion/src",
+  "sourceRoot": "apps/onion-api/src",
   "compilerOptions": {
     "deleteOutDir": true,
     "webpack": true,
-    "tsConfigPath": "apps/onion/tsconfig.app.json"
+    "tsConfigPath": "apps/onion-api/tsconfig.app.json"
   },
   "monorepo": true,
-  "root": "apps/onion",
+  "root": "apps/onion-api",
   "projects": {
     "onion-api": {
       "type": "application",
