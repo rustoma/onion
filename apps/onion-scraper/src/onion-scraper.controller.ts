@@ -9,4 +9,9 @@ export class OnionScraperController {
   async scrapByAsinApi() {
     return await this.onionScraperService.scrap();
   }
+
+  @Get('fingerprints')
+  async getBrowserFingerprints() {
+    return await this.onionScraperService.getBrowserFingerprints();
+  }
 }

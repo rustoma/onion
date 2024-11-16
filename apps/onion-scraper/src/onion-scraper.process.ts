@@ -45,6 +45,30 @@ export class OnionScraperConsumer extends WorkerHost {
     return { browser, page };
   }
 
+  async handleGetBrowserFingerprints() {
+    const { browser, page } = await this.launchBrowser();
+
+    await page.goto('https://echo.free.beeceptor.com');
+
+    await page.screenshot({
+      path: './screenshots/browser-finger-1.jpg',
+      fullPage: true,
+    });
+
+    await browser.close();
+
+    const { browser: browser2, page: page2 } = await this.launchBrowser();
+
+    await page2.goto('https://tls.peet.ws/api/tls');
+
+    await page2.screenshot({
+      path: './screenshots/browser-finger-2.jpg',
+      fullPage: true,
+    });
+
+    await browser2.close();
+  }
+
   extractASIN(url: string): string | null {
     if (!url) return null;
     const match = url.match(/\/dp\/([A-Z0-9]+)/);
@@ -344,6 +368,10 @@ export class OnionScraperConsumer extends WorkerHost {
       }
       case SCRAPER_JOBS.scrapByKeyword: {
         await this.handleScrapByKeyword(query);
+        break;
+      }
+      case SCRAPER_JOBS.getBrowserFingerprints: {
+        await this.handleGetBrowserFingerprints();
         break;
       }
     }

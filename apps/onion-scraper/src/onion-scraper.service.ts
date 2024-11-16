@@ -60,4 +60,14 @@ export class OnionScraperService {
 
     console.log(`${SCRAPER_JOBS.scrapByAsin} added to the queue`);
   }
+
+  async getBrowserFingerprints() {
+    await this.scraperQueue.add(
+      SCRAPER_JOBS.getBrowserFingerprints,
+      {},
+      this.DEFAULT_JOB_OPTIONS,
+    );
+
+    console.log(`${SCRAPER_JOBS.getBrowserFingerprints} added to the queue`);
+  }
 }
