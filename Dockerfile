@@ -41,6 +41,8 @@ RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key
 # Set NODE_ENV
 ENV NODE_ENV production
 
+RUN mkdir -p ./screenshots && chmod -R 777 ./screenshots
+
 # Use non-root user
 # Use --chown on COPY commands to set file permissions
 USER node
