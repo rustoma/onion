@@ -15,7 +15,7 @@ import { SCRAPER_JOBS } from '@scraper/onion-scraper.consts';
 import { Query } from '@prisma/client';
 import { DbService } from 'lib/db';
 
-@Processor('scraper', { concurrency: 3 })
+@Processor('scraper', { concurrency: 1 })
 export class OnionScraperConsumer extends WorkerHost {
   constructor(private db: DbService) {
     super();
@@ -28,19 +28,12 @@ export class OnionScraperConsumer extends WorkerHost {
   async launchBrowser() {
     const { browser, page } = await connect({
       args: ['--start-maximized'],
-
-      headless: false,
-
-      customConfig: {},
-
       turnstile: true,
-
+      headless: false,
+      customConfig: {},
       connectOption: {
         defaultViewport: null,
       },
-
-      disableXvfb: false,
-      ignoreAllFlags: false,
       // proxy:{
       //     host:'<proxy-host>',
       //     port:'<proxy-port>',
