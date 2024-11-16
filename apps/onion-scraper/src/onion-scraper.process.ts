@@ -55,31 +55,23 @@ export class OnionScraperConsumer extends WorkerHost {
       fullPage: true,
     });
 
-    await browser.close();
+    await page.goto('https://tls.peet.ws/api/tls');
 
-    const { browser: browser2, page: page2 } = await this.launchBrowser();
-
-    await page2.goto('https://tls.peet.ws/api/tls');
-
-    await page2.screenshot({
+    await page.screenshot({
       path: './screenshots/browser-finger-2.jpg',
       fullPage: true,
     });
 
-    await browser2.close();
-
-    const { browser: browser3, page: page3 } = await this.launchBrowser();
-
-    await page3.goto('https://fingerprint.com/products/bot-detection');
+    await page.goto('https://fingerprint.com/products/bot-detection');
 
     await this.sleep(10000);
 
-    await page3.screenshot({
-      path: './screenshots/browser-finger-2.jpg',
+    await page.screenshot({
+      path: './screenshots/browser-finger-3.jpg',
       fullPage: true,
     });
 
-    await browser3.close();
+    await browser.close();
   }
 
   extractASIN(url: string): string | null {
