@@ -1,0 +1,45 @@
+services:
+  postgres:
+    image: postgres:15.1
+    restart: always
+    container_name: postgres
+    env_file:
+      - ./.env
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - backend
+    ports:
+      - '6500:5432'
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
+    restart: always
+    env_file:
+      - ./.env
+    networks:
+      - backend
+    ports:
+      - '6379:6379'
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: onion-scraper
+    env_file:
+      - ./.env
+    networks:
+      - backend
+    ports:
+      - '3000:3000'
+    depends_on:
+      - postgres
+      - redis
+
+volumes:
+  pgdata:
+networks:
+  backend:
