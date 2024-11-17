@@ -48,7 +48,6 @@ COPY --chown=node:node --from=builder /app/libs/db/src/prisma ./libs/db/src/pris
 COPY --chown=node:node --from=builder /app/node_modules ./node_modules
 COPY --chown=node:node --from=builder /app/package*.json ./
 COPY --chown=node:node --from=builder /app/dist ./dist
-COPY --chown=node:node --from=builder /app/.env ./env
 
 EXPOSE 3000
 
