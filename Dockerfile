@@ -1,5 +1,5 @@
 # Use the official Node.js 16 image as the base image
-FROM node:19 AS builder
+FROM node:22.11 AS builder
 
 # Set the working directory inside the container
 WORKDIR /app
@@ -17,7 +17,7 @@ COPY . .
 
 RUN npm run build onion-scraper
 
-FROM node:19 AS production
+FROM node:22.11 AS production
 
 # Install necessary dependencies for running Chrome
 RUN apt-get update && apt-get install -y \
