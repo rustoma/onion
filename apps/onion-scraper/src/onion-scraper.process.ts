@@ -32,6 +32,8 @@ export class OnionScraperConsumer extends WorkerHost {
   async launchBrowser() {
     const { browser, page } = await connect({
       args: [
+        '--shm-size=3gb',
+        '--disable-dev-shm-usage',
         `--proxy-server=${this.configService.get('PROXY_HOST')}:${this.configService.get('PROXY_PORT')}`,
       ],
       turnstile: true,
