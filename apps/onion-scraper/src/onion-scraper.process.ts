@@ -47,11 +47,6 @@ export class OnionScraperConsumer extends WorkerHost {
       password: this.configService.get('PROXY_PASSWORD'),
     });
 
-    await page.setViewport({
-      width: 1920,
-      height: 1080,
-    });
-
     return { browser, page };
   }
 
