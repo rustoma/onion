@@ -15,9 +15,6 @@ RUN npm install
 # Copy the rest of the application source code to the container
 COPY . .
 
-# Copy the .env file into the container
-COPY .env .env
-
 RUN npm run build onion-scraper
 
 FROM node:19 AS production

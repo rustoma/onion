@@ -14,10 +14,14 @@ import { Job } from 'bullmq';
 import { SCRAPER_JOBS } from '@scraper/onion-scraper.consts';
 import { Query } from '@prisma/client';
 import { DbService } from 'lib/db';
+import { ConfigService } from '@nestjs/config';
 
 @Processor('scraper')
 export class OnionScraperConsumer extends WorkerHost {
-  constructor(private db: DbService) {
+  constructor(
+    private db: DbService,
+    private configService: ConfigService,
+  ) {
     super();
   }
 
@@ -27,19 +31,25 @@ export class OnionScraperConsumer extends WorkerHost {
 
   async launchBrowser() {
     const { browser, page } = await connect({
-      args: ['--start-maximized'],
+      args: [
+        `--proxy-server=${this.configService.get('PROXY_HOST')}:${this.configService.get('PROXY_PORT')}`,
+      ],
       turnstile: true,
       headless: false,
       customConfig: {},
       connectOption: {
         defaultViewport: null,
       },
-      // proxy:{
-      //     host:'<proxy-host>',
-      //     port:'<proxy-port>',
-      //     username:'<proxy-username>',
-      //     password:'<proxy-password>'
-      // }
+    });
+
+    await page.authenticate({
+      username: this.configService.get('PROXY_USERNAME'),
+      password: this.configService.get('PROXY_PASSWORD'),
+    });
+
+    await page.setViewport({
+      width: 1920,
+      height: 1080,
     });
 
     return { browser, page };
@@ -59,15 +69,6 @@ export class OnionScraperConsumer extends WorkerHost {
 
     await page.screenshot({
       path: './screenshots/browser-finger-2.jpg',
-      fullPage: true,
-    });
-
-    await page.goto('https://fingerprint.com/products/bot-detection');
-
-    await this.sleep(10000);
-
-    await page.screenshot({
-      path: './screenshots/browser-finger-3.jpg',
       fullPage: true,
     });
 
@@ -165,22 +166,22 @@ export class OnionScraperConsumer extends WorkerHost {
 
     await page.goto(`https://www.hagglezon.com/en/s/${keyword}`);
 
-    await page.waitForSelector('.user-options', { timeout: 60000 });
+    await page.waitForSelector('.user-options', { timeout: 15000 });
 
     await page.click('[data-test="user-options-btn"]');
 
-    await page.waitForSelector('.currency-list', { timeout: 60000 });
+    await page.waitForSelector('.currency-list', { timeout: 15000 });
 
     await page.click('input[name="currency"][value="PLN"]');
 
-    await page.waitForSelector('.sub-menu button', { timeout: 60000 });
+    await page.waitForSelector('.sub-menu button', { timeout: 15000 });
 
     await page.click('.sub-menu button');
 
-    await page.waitForSelector('.search-results', { timeout: 60000 });
+    await page.waitForSelector('.search-results', { timeout: 15000 });
 
     await page.waitForSelector('.card-media:not(.fake-element)', {
-      timeout: 60000,
+      timeout: 15000,
     });
 
     // Scroll and wait strategy with a timeout for loading additional content
@@ -193,7 +194,7 @@ export class OnionScraperConsumer extends WorkerHost {
       }
 
       await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-      await this.sleep(10000);
+      await this.sleep(5000);
 
       // Check if the loading spinner is still visible
       hasMoreContent = await page.evaluate(() => {
@@ -201,7 +202,7 @@ export class OnionScraperConsumer extends WorkerHost {
       });
     }
 
-    await this.sleep(10000);
+    await this.sleep(5000);
 
     const html = await page.content();
     await browser.close();
@@ -306,24 +307,24 @@ export class OnionScraperConsumer extends WorkerHost {
 
     await page.goto(`https://www.hagglezon.com/en/s/${asin}`);
 
-    await page.waitForSelector('.user-options', { timeout: 60000 });
+    await page.waitForSelector('.user-options', { timeout: 15000 });
 
     await page.click('[data-test="user-options-btn"]');
 
-    await page.waitForSelector('.currency-list', { timeout: 60000 });
+    await page.waitForSelector('.currency-list', { timeout: 15000 });
 
     await page.click('input[name="currency"][value="PLN"]');
 
-    await page.waitForSelector('.sub-menu button', { timeout: 60000 });
+    await page.waitForSelector('.sub-menu button', { timeout: 15000 });
 
     await page.click('.sub-menu button');
 
-    await this.sleep(10000);
+    await this.sleep(5000);
 
-    await page.waitForSelector('.search-results-container', { timeout: 60000 });
+    await page.waitForSelector('.search-results-container', { timeout: 15000 });
 
     await page.waitForSelector('.card-media:not(.fake-element)', {
-      timeout: 60000,
+      timeout: 15000,
     });
 
     const html = await page.content();
