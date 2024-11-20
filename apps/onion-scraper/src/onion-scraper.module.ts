@@ -9,11 +9,13 @@ import { BullBoardModule } from '@bull-board/nestjs';
 import { ExpressAdapter } from '@bull-board/express';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ScheduleModule } from '@nestjs/schedule';
+import { MailModule } from '@scraper/mail/mail.module';
 
 @Module({
   imports: [
     DbModule,
     ConfigModule,
+    MailModule,
     ScheduleModule.forRoot(),
     BullModule.forRootAsync({
       imports: [ConfigModule],

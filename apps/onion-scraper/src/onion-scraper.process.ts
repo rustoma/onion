@@ -16,12 +16,14 @@ import { Query } from '@prisma/client';
 import { DbService } from 'lib/db';
 import { ConfigService } from '@nestjs/config';
 import { BadRequestException } from '@nestjs/common';
+import { MailService } from '@scraper/mail/mail.service';
 
 @Processor('scraper')
 export class OnionScraperConsumer extends WorkerHost {
   constructor(
     private db: DbService,
     private configService: ConfigService,
+    private mailService: MailService,
   ) {
     super();
   }
@@ -299,10 +301,22 @@ export class OnionScraperConsumer extends WorkerHost {
       },
     });
 
+    await this.mailService.sendDealMessage({
+      name: product.title,
+      price: price.value,
+      url: price.url,
+    });
+
     if (priceAlert && price?.value <= priceAlert) {
       console.log(
         `Handle price alert because price is ${price.value} and price alert is ${priceAlert} for product ${title}`,
       );
+
+      await this.mailService.sendPriceAlertMessage({
+        name: product.title,
+        price: price.value,
+        url: price.url,
+      });
     }
   }
 
