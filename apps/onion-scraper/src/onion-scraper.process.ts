@@ -15,6 +15,7 @@ import { SCRAPER_JOBS } from '@scraper/onion-scraper.consts';
 import { Query } from '@prisma/client';
 import { DbService } from 'lib/db';
 import { ConfigService } from '@nestjs/config';
+import { BadRequestException } from '@nestjs/common';
 
 @Processor('scraper')
 export class OnionScraperConsumer extends WorkerHost {
@@ -29,12 +30,26 @@ export class OnionScraperConsumer extends WorkerHost {
     return new Promise((res) => setTimeout(res, ms));
   }
 
+  getRandomProxy(proxyArr: string[]) {
+    return proxyArr[Math.floor(Math.random() * proxyArr.length)];
+  }
+
   async launchBrowser() {
+    const proxyList: string | undefined = this.configService.get('PROXY_LIST');
+
+    if (!proxyList) throw new BadRequestException('Proxy is missing');
+
+    const proxyArray = proxyList.split(',');
+
+    if (!proxyArray.length) throw new BadRequestException('Proxy is missing');
+
+    const proxy = this.getRandomProxy(proxyArray);
+
     const { browser, page } = await connect({
       args: [
         '--shm-size=3gb',
         '--disable-dev-shm-usage',
-        `--proxy-server=${this.configService.get('PROXY_HOST')}:${this.configService.get('PROXY_PORT')}`,
+        `--proxy-server=${proxy}`,
       ],
       turnstile: true,
       headless: false,
@@ -42,11 +57,6 @@ export class OnionScraperConsumer extends WorkerHost {
       connectOption: {
         defaultViewport: null,
       },
-    });
-
-    await page.authenticate({
-      username: this.configService.get('PROXY_USERNAME'),
-      password: this.configService.get('PROXY_PASSWORD'),
     });
 
     return { browser, page };
