@@ -8,11 +8,13 @@ import { OnionScraperConsumer } from '@scraper/onion-scraper.process';
 import { BullBoardModule } from '@bull-board/nestjs';
 import { ExpressAdapter } from '@bull-board/express';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
     DbModule,
     ConfigModule,
+    ScheduleModule.forRoot(),
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
