@@ -37,7 +37,7 @@ export class OnionScraperService {
     }
   }
 
-  @Cron('0 3 * * *')
+  @Cron('0 8 * * *')
   async scrap() {
     const queries = await this.getQueries();
     queries.forEach(this.scrapQuery.bind(this));
