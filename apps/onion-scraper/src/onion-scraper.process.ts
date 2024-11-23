@@ -5,6 +5,8 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import {
   Deal,
   HandleAsinDeal,
+  Notify,
+  NOTIFY_TYPE,
   PriceData,
   Product,
   ScraperJobNames,
@@ -15,11 +17,15 @@ import { SCRAPER_JOBS } from '@scraper/onion-scraper.consts';
 import { Query } from '@prisma/client';
 import { DbService } from 'lib/db';
 import { ConfigService } from '@nestjs/config';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, Logger } from '@nestjs/common';
 import { MailService } from '@scraper/mail/mail.service';
+import { DealMailDTO } from '@scraper/mail/dto/deal-mail.dto';
 
 @Processor('scraper')
 export class OnionScraperConsumer extends WorkerHost {
+  private readonly logger = new Logger(OnionScraperConsumer.name);
+  private PRICE_DIFFERENCE_PERCENTAGE_TO_TRIGGER_DEAL = 40;
+
   constructor(
     private db: DbService,
     private configService: ConfigService,
@@ -103,17 +109,23 @@ export class OnionScraperConsumer extends WorkerHost {
     const priceText = priceElement.text().trim();
 
     const priceValue = priceText
-      ? parseFloat(priceText.replace(/[^\d,.-]+/g, '').replace(',', '.'))
+      ? Number(priceText.replace('PLN', '').replace(/\s|,/g, ''))
       : null;
 
     const url = domainLink ? domainLink.split('?')[0] : null;
 
-    return domain && priceValue && url
+    return domain && priceValue && !Number.isNaN(priceValue) && url
       ? { domain, value: priceValue, url }
       : null;
   }
 
-  findDeals(products: Product[]): Deal[] {
+  findDeals({
+    products,
+    priceAlert,
+  }: {
+    products: Product[];
+    priceAlert?: number;
+  }): Deal[] {
     return products
       .map((product) => {
         const { title, asin, image, prices } = product;
@@ -139,13 +151,27 @@ export class OnionScraperConsumer extends WorkerHost {
         const lowestPrice = pricesArray[0];
         const secondLowestPrice = pricesArray[1];
 
+        if (lowestPrice && priceAlert && lowestPrice.value < priceAlert) {
+          const { url, value } = lowestPrice;
+
+          return {
+            asin,
+            title,
+            image,
+            price: { value: value, url: url },
+          };
+        }
+
         if (lowestPrice && secondLowestPrice) {
           const priceDifferencePercentage =
             ((secondLowestPrice.value - lowestPrice.value) /
-              secondLowestPrice.value) *
+              lowestPrice.value) *
             100;
 
-          if (priceDifferencePercentage > 5) {
+          if (
+            priceDifferencePercentage >
+            this.PRICE_DIFFERENCE_PERCENTAGE_TO_TRIGGER_DEAL
+          ) {
             const { url, value } = lowestPrice;
 
             return {
@@ -158,7 +184,7 @@ export class OnionScraperConsumer extends WorkerHost {
 
           return null;
         } else {
-          console.log(`Not enough prices found for comparison.`);
+          this.logger.log(`Not enough prices found for comparison.`);
           return null;
         }
       })
@@ -248,10 +274,26 @@ export class OnionScraperConsumer extends WorkerHost {
       }
     });
 
-    const deals = this.findDeals(products);
+    const deals = this.findDeals({ products });
 
     if (Array.isArray(deals) && deals.length) {
       await Promise.all(deals.map((deal) => this.handleDeal({ deal })));
+    }
+  }
+
+  async notify({ name, price, url, type }: Notify) {
+    try {
+      const dataToSend: DealMailDTO = { name, price, url };
+
+      if (type === NOTIFY_TYPE.priceAlert) {
+        return await this.mailService.sendPriceAlertMessage(dataToSend);
+      }
+
+      if (type === NOTIFY_TYPE.deal) {
+        return await this.mailService.sendDealMessage(dataToSend);
+      }
+    } catch (e) {
+      console.log(e);
     }
   }
 
@@ -301,23 +343,17 @@ export class OnionScraperConsumer extends WorkerHost {
       },
     });
 
-    await this.mailService.sendDealMessage({
+    const mailDTO: DealMailDTO = {
       name: product.title,
       price: price.value,
       url: price.url,
-    });
+    };
 
     if (priceAlert && price?.value <= priceAlert) {
-      console.log(
-        `Handle price alert because price is ${price.value} and price alert is ${priceAlert} for product ${title}`,
-      );
-
-      await this.mailService.sendPriceAlertMessage({
-        name: product.title,
-        price: price.value,
-        url: price.url,
-      });
+      return await this.notify({ ...mailDTO, type: NOTIFY_TYPE.priceAlert });
     }
+
+    await this.notify({ ...mailDTO, type: NOTIFY_TYPE.deal });
   }
 
   async handleScrapByAsin(query: Query) {
@@ -378,7 +414,7 @@ export class OnionScraperConsumer extends WorkerHost {
 
     const product = { title, asin, image: imageUrl ?? '', prices };
 
-    const deals = this.findDeals([product]);
+    const deals = this.findDeals({ products: [product], priceAlert });
 
     if (Array.isArray(deals) && deals.length) {
       await this.handleDeal({ deal: deals[0], priceAlert });

@@ -32,3 +32,15 @@ export interface HandleAsinDeal {
   deal: Deal;
   priceAlert?: number | null;
 }
+
+export enum NOTIFY_TYPE {
+  priceAlert = 'priceAlert',
+  deal = 'deal',
+}
+
+export interface Notify {
+  name: string;
+  price: number;
+  url: string;
+  type: NOTIFY_TYPE;
+}
