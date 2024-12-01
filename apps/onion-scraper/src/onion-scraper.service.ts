@@ -46,7 +46,7 @@ export class OnionScraperService {
   async handleScrapByKeyword(query: Query) {
     await this.scraperQueue.add(
       SCRAPER_JOBS.scrapByKeyword,
-      { query },
+      { query: { ...query, jobAddedAt: new Date() } },
       this.DEFAULT_JOB_OPTIONS,
     );
 
@@ -56,7 +56,7 @@ export class OnionScraperService {
   async handleScrapByAsin(query: Query) {
     await this.scraperQueue.add(
       SCRAPER_JOBS.scrapByAsin,
-      { query },
+      { query: { ...query, jobAddedAt: new Date() } },
       this.DEFAULT_JOB_OPTIONS,
     );
 
