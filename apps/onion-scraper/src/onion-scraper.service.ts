@@ -4,7 +4,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { SCRAPER_JOBS } from '@scraper/onion-scraper.consts';
 import { DbService } from 'lib/db';
 import { Query } from '@prisma/client';
-import { Cron } from '@nestjs/schedule';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 @Injectable()
 export class OnionScraperService {
@@ -37,7 +37,7 @@ export class OnionScraperService {
     }
   }
 
-  @Cron('0 8 * * *')
+  @Cron(CronExpression.EVERY_DAY_AT_10AM)
   async scrap() {
     const queries = await this.getQueries();
     queries.forEach(this.scrapQuery.bind(this));
